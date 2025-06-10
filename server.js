@@ -23,12 +23,9 @@ mongoose
 // Middleware Setup
 // ==============================
 
-// CORS — allow frontend requests
-const cors = require("cors");
-
 const allowedOrigins = [
-  "http://localhost:1234", // for local dev (optional)
-  "https://chinwagevents.netlify.app", // your Netlify frontend
+  "http://localhost:1234",
+  "https://chinwagevents.netlify.app",
 ];
 
 app.use(
