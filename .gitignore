@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+
+# Environment
+.env
+
+# OS + Editor junk
+.DS_Store
+.vscode/
+
+# Build or cache directories (if any)
+dist/
+.cache/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+
+# Uploaded files (if you don't want to include test assets)
+uploads/
+public/images/
+
+# Parcel, Sass (if ever used)
+*.map
+.sass-cache/

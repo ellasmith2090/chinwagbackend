@@ -1,0 +1,7 @@
+// config/constants.js
+module.exports = {
+  EVENT_IMAGE_WIDTH: 800,
+  EVENT_IMAGE_HEIGHT: 600,
+  AVATAR_IMAGE_WIDTH: 200,
+  AVATAR_IMAGE_HEIGHT: 200
+}
