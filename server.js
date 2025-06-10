@@ -24,9 +24,18 @@ mongoose
 // ==============================
 
 // CORS — allow frontend requests
+const allowedOrigins = ["http://localhost:1234", "https://chinwag.netlify.app"];
+
 app.use(
   cors({
-    origin: "http://localhost:1234", // Change if your frontend is hosted elsewhere
+    origin: function (origin, callback) {
+      // Allow requests with no origin like mobile apps or curl
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
