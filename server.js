@@ -7,6 +7,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const cookieParser = require("cookie-parser"); // ✅ If using cookies
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -37,11 +38,11 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true,
+    credentials: true, // ✅ Required for cookies/headers/tokens
   })
 );
 
-// Parse incoming JSON and form data
+app.use(cookieParser()); // ✅ Important if using JWT in cookies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
