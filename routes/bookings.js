@@ -98,9 +98,41 @@ router.put(
     }
   }
 );
+// ==============================
+// DELETE - Guest booking
+// ==============================
+router.delete("/:bookingId", authenticateToken, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.bookingId);
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    if (booking.userId.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to cancel this booking" });
+    }
+
+    const event = await Event.findById(booking.eventId);
+    if (event) {
+      event.bookings = event.bookings.filter(
+        (b) => b.toString() !== booking._id.toString()
+      );
+      event.seatsFilled = Math.max(0, event.seatsFilled - 1);
+      await event.save();
+    }
+
+    await booking.deleteOne();
+    res.json({ message: "Booking cancelled" });
+  } catch (err) {
+    console.error("[Guest Cancel Booking] Error:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to cancel booking", error: err.message });
+  }
+});
 
 // ==============================
-// DELETE - Remove a booking
+// DELETE - Remove a booking (host)
 // ==============================
 router.delete(
   "/:eventId/bookings/:bookingId",
@@ -116,7 +148,6 @@ router.delete(
       const event = await Event.findById(eventId);
       if (!event) return res.status(404).json({ message: "Event not found" });
 
-      // Remove reference and update seat count
       event.bookings = event.bookings.filter((b) => b.toString() !== bookingId);
       event.seatsFilled = Math.max(0, event.seatsFilled - 1);
       await event.save();
