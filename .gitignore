@@ -8,14 +8,22 @@ node_modules/
 .DS_Store
 .vscode/
 
-# Build or cache directories (if any)
+# Build or cache directories
 dist/
 .cache/
 
 # Log files
+*.log
 npm-debug.log*
 yarn-debug.log*
 
-# Parcel, Sass (if ever used)
+# Parcel, Sass
 *.map
 .sass-cache/
+
+# User uploads
+uploads/
+
+# Temporary files
+*.bak
+*.tmp
