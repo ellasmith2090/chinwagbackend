@@ -1,6 +1,6 @@
-//========================
-// routes/bookings.js
-//========================
+// ==============================
+// routes/bookings.js — Booking routes (Create, Read, Update, Delete)
+// ==============================
 
 const express = require("express");
 const router = express.Router();
@@ -8,16 +8,16 @@ const Booking = require("../models/Booking");
 const Event = require("../models/Event");
 const authenticateToken = require("../middleware/authMiddleware");
 
+// ==============================
 // POST - Create a booking
+// ==============================
 router.post("/:eventId/book", authenticateToken, async (req, res) => {
   const { guestName, contact, notes, avatar } = req.body;
   const { eventId } = req.params;
 
   try {
     const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    if (!event) return res.status(404).json({ message: "Event not found" });
 
     if (event.seatsFilled >= event.seatsTotal) {
       return res.status(400).json({ message: "Event is already full" });
@@ -47,29 +47,33 @@ router.post("/:eventId/book", authenticateToken, async (req, res) => {
   }
 });
 
-// GET - Get all bookings for a specific event
+// ==============================
+// GET - All bookings for an event (with user data)
+// ==============================
 router.get("/:eventId/bookings", async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId).populate({
       path: "bookings",
       populate: {
         path: "userId",
-        select: "avatar email _id",
+        select: "firstName lastName email avatar", // ✅ Ensures consistent profile data
       },
     });
 
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
+    if (!event) return res.status(404).json({ message: "Event not found" });
 
     res.json(event.bookings);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Error fetching bookings", error: err });
+    res
+      .status(500)
+      .json({ message: "Error fetching bookings", error: err.message });
   }
 });
 
+// ==============================
 // PUT - Update booking notes
+// ==============================
 router.put(
   "/:eventId/bookings/:bookingId/note",
   authenticateToken,
@@ -79,9 +83,8 @@ router.put(
       const { notes } = req.body;
 
       const booking = await Booking.findById(bookingId);
-      if (!booking) {
+      if (!booking)
         return res.status(404).json({ message: "Booking not found" });
-      }
 
       booking.notes = notes;
       await booking.save();
@@ -96,7 +99,9 @@ router.put(
   }
 );
 
-// DELETE - Remove booking
+// ==============================
+// DELETE - Remove a booking
+// ==============================
 router.delete(
   "/:eventId/bookings/:bookingId",
   authenticateToken,
@@ -105,15 +110,13 @@ router.delete(
       const { eventId, bookingId } = req.params;
 
       const booking = await Booking.findByIdAndDelete(bookingId);
-      if (!booking) {
+      if (!booking)
         return res.status(404).json({ message: "Booking not found" });
-      }
 
       const event = await Event.findById(eventId);
-      if (!event) {
-        return res.status(404).json({ message: "Event not found" });
-      }
+      if (!event) return res.status(404).json({ message: "Event not found" });
 
+      // Remove reference and update seat count
       event.bookings = event.bookings.filter((b) => b.toString() !== bookingId);
       event.seatsFilled = Math.max(0, event.seatsFilled - 1);
       await event.save();

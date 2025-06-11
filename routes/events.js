@@ -45,7 +45,7 @@ router.get("/", async (req, res) => {
     const events = await Event.find()
       .populate({
         path: "bookings",
-        populate: { path: "userId", select: "_id email avatar" },
+        populate: { path: "userId", select: "firstName lastName email avatar" },
       })
       .sort({ date: 1 })
       .lean();
@@ -64,8 +64,15 @@ router.get("/", async (req, res) => {
 // ==============================
 router.get("/:id", async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id).lean();
+    const event = await Event.findById(req.params.id)
+      .populate({
+        path: "bookings",
+        populate: { path: "userId", select: "firstName lastName email avatar" },
+      })
+      .lean();
+
     if (!event) return res.status(404).json({ message: "Event not found" });
+
     res.json(event);
   } catch (err) {
     res
@@ -82,7 +89,7 @@ router.get("/host/:hostId", async (req, res) => {
     const events = await Event.find({ hostId: req.params.hostId })
       .populate({
         path: "bookings",
-        populate: { path: "userId", select: "avatar" },
+        populate: { path: "userId", select: "firstName lastName email avatar" },
       })
       .sort({ date: 1 })
       .lean();
@@ -105,13 +112,13 @@ router.post(
   upload.single("image"),
   async (req, res) => {
     try {
-      if (req.user.accessLevel !== 2)
+      if (req.user.accessLevel !== 2) {
         return res
           .status(403)
           .json({ message: "Only hosts can create events" });
+      }
 
       const { title, date, address, description, seatsTotal } = req.body;
-
       if (
         !title ||
         !date ||
@@ -166,13 +173,15 @@ router.put(
   upload.single("image"),
   async (req, res) => {
     try {
-      if (req.user.accessLevel !== 2)
+      if (req.user.accessLevel !== 2) {
         return res
           .status(403)
           .json({ message: "Only hosts can update event images" });
+      }
 
-      if (!req.file)
+      if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
+      }
 
       const filename = `${req.params.id}-${Date.now()}.png`;
       const filepath = path.join(uploadsDir, filename);
@@ -203,8 +212,9 @@ router.put(
 // ==============================
 router.put("/:id", authenticateToken, async (req, res) => {
   try {
-    if (req.user.accessLevel !== 2)
+    if (req.user.accessLevel !== 2) {
       return res.status(403).json({ message: "Only hosts can update events" });
+    }
 
     const updated = await Event.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -223,8 +233,9 @@ router.put("/:id", authenticateToken, async (req, res) => {
 // ==============================
 router.delete("/:id", authenticateToken, async (req, res) => {
   try {
-    if (req.user.accessLevel !== 2)
+    if (req.user.accessLevel !== 2) {
       return res.status(403).json({ message: "Only hosts can delete events" });
+    }
 
     const result = await Event.findByIdAndDelete(req.params.id);
     if (!result) return res.status(404).json({ message: "Event not found" });
@@ -244,27 +255,29 @@ router.delete("/:id", authenticateToken, async (req, res) => {
 router.post("/:id/book", authenticateToken, async (req, res) => {
   try {
     const { guestName, contact, notes } = req.body;
-
-    if (!guestName || !contact)
+    if (!guestName || !contact) {
       return res
         .status(400)
         .json({ message: "Guest name and contact are required." });
+    }
 
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: "Event not found" });
 
-    const alreadyBooked = event.bookings.some(
-      (booking) =>
-        booking.contact === contact || booking.guestName === guestName
-    );
+    const alreadyBooked = await Booking.findOne({
+      eventId: event._id,
+      userId: req.user.id,
+    });
+
     if (alreadyBooked) {
       return res
         .status(400)
         .json({ message: "You have already booked this event." });
     }
 
-    if (event.seatsFilled >= event.seatsTotal)
+    if (event.seatsFilled >= event.seatsTotal) {
       return res.status(400).json({ message: "Event is full" });
+    }
 
     const newBooking = new Booking({
       guestName,
@@ -285,7 +298,7 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
     res.json({
       message: "Booking successful",
       booking: newBooking,
-      event: updatedEvent, // Include updated event with correct seatsFilled
+      event: updatedEvent,
     });
   } catch (err) {
     console.error("[POST /:id/book] Error:", err);
@@ -312,7 +325,6 @@ router.delete(
       const event = await Event.findById(eventId);
       if (!event) return res.status(404).json({ message: "Event not found" });
 
-      // Remove booking from event
       event.bookings = event.bookings.filter((b) => b.toString() !== bookingId);
       event.seatsFilled = Math.max(0, event.seatsFilled - 1);
       await event.save();
