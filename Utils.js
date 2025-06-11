@@ -44,13 +44,13 @@ class Utils {
   }
 
   /**
-   * Generates a JWT access token for a user.
-   * @param {object} user - The user object with _id and accessLevel (1 for user, 2 for admin).
-   * @returns {string} The signed JWT token.
+   * Generates a JWT access token for user.
+   * @param {object} user - user object with _id and accessLevel (1 for user, 2 for admin).
+   * @returns {string} signed JWT token.
    * @throws {Error} If accessLevel is not 1 or 2.
    */
   generateAccessToken(user) {
-    const accessLevel = user.accessLevel || 1; // Default to user
+    const accessLevel = user.accessLevel || 1; // default to user
     if (![1, 2].includes(accessLevel)) {
       throw new Error("Invalid accessLevel: must be 1 (user) or 2 (admin)");
     }
@@ -64,9 +64,9 @@ class Utils {
   }
 
   /**
-   * Verifies a JWT token.
+   * Verifies JWT token.
    * @param {string} token - The JWT token to verify.
-   * @returns {object|null} The decoded payload if valid, null if invalid.
+   * @returns {object|null} decoded payload if valid, null if not.
    */
   verifyToken(token) {
     try {
