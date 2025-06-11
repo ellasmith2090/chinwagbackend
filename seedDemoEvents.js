@@ -1,62 +1,70 @@
-// seedDemoEvents.js
-
-require("dotenv").config();
 const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+dotenv.config();
+
 const Event = require("./models/Event");
 
-const hostId = "684841272faa23bc48993b25"; // Your real host user
-
-const demoEvents = [
-  {
-    title: "Mezze Monday",
-    description: "Enjoy a Mediterranean platter and a good chat.",
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow
-    address: "123 Olive Lane, Byron Bay",
-    image: "mezzemonday.png", // served from /images/
-    hostId,
-    seatsTotal: 10,
-    seatsFilled: 3,
-    bookings: [],
-  },
-  {
-    title: "Social Saturday",
-    description: "A casual catch-up for friendly locals.",
-    date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    address: "56 Beach Parade, Noosa",
-    image: "socialsaturday.png",
-    hostId,
-    seatsTotal: 8,
-    seatsFilled: 2,
-    bookings: [],
-  },
-  {
-    title: "Coffee & Chit Chat",
-    description: "Great coffee, better conversation!",
-    date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week later
-    address: "88 Bean Street, Eumundi",
-    image: "coffeechitchat.png",
-    hostId,
-    seatsTotal: 12,
-    seatsFilled: 6,
-    bookings: [],
-  },
-];
-
+// Connect to DB
 async function seed() {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ Connected to DB");
 
-    await Event.deleteMany();
+    // Clear old events
+    await Event.deleteMany({});
     console.log("🧹 Old events cleared");
 
-    await Event.insertMany(demoEvents);
+    // Seed demo events with provided hostId
+    const demoEvents = await Event.insertMany([
+      {
+        title: "Coffee Chit Chat",
+        description:
+          "A friendly nook for casual conversations and warm sips, Coffee Chit Chat is your Sunday slow-down with a social twist. Whether you're new in town or just keen to connect, this easygoing gathering offers a welcoming table, good coffee, and light-hearted prompts to spark meaningful chatter — no pressure, just presence.",
+        address: "12 Brew Street, Chatfield, VIC 3051",
+        date: new Date("2025-06-28T10:00:00"),
+        image: "coffeechitchat.png",
+        seatsTotal: 15,
+        seatsFilled: 1,
+        hostId: "684841272faa23bc48993b25",
+        bookings: [],
+      },
+      {
+        title: "Monday Mezze",
+        description:
+          "Ease into the week with a mellow Monday evening centred around shared plates and stories. This intimate mezze night invites guests to gather around a long table, enjoying warm dishes, cool drinks, and reflective conversation. Whether you're decompressing from the day or leaning into new intentions, this space is made for meaningful connection — one bite at a time.",
+        address: "3 Olive Lane, Hummus Hill, VIC 3051",
+        date: new Date("2025-06-29T18:30:00"),
+        image: "mezzemonday.png",
+        seatsTotal: 10,
+        seatsFilled: 0,
+        hostId: "684841272faa23bc48993b25",
+        bookings: [],
+      },
+      {
+        title: "Social Saturday",
+        description:
+          "Kick off your weekend with energy and ease at Social Saturday — a casual gathering built for making friends, not small talk. With upbeat tunes, communal snacks, and a few playful conversation starters, this event creates a low-pressure space for real connection. Come as you are and stay as long as you like — it’s a Saturday hangout without the awkward edges.",
+        address: "22 Vibe Street, Goodtimes Grove, VIC 3051",
+        date: new Date("2025-07-06T19:00:00"),
+        image: "socialsaturday.png",
+        seatsTotal: 5,
+        seatsFilled: 0,
+        hostId: "684841272faa23bc48993b25",
+        bookings: [],
+      },
+    ]);
+
     console.log("📦 Demo events inserted");
 
-    await mongoose.disconnect();
-    console.log("🔌 DB connection closed");
+    // Output event IDs for use in booking seeding
+    demoEvents.forEach((event) => {
+      console.log(`🆔 ${event.title}: ${event._id}`);
+    });
   } catch (err) {
-    console.error("❌ Seeding failed:", err);
+    console.error("❌ Seed failed", err);
+  } finally {
+    await mongoose.connection.close();
+    console.log("🔌 DB connection closed");
   }
 }
 
