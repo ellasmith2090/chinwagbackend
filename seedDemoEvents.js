@@ -24,7 +24,7 @@ async function seed() {
         date: new Date("2025-06-28T10:00:00"),
         image: "coffeechitchat.png",
         seatsTotal: 15,
-        seatsFilled: 1,
+        seatsFilled: 0,
         hostId: "684841272faa23bc48993b25",
         bookings: [],
       },
