@@ -140,6 +140,7 @@ app.use(errorHandler);
 // ==============================
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log("Current working directory:", process.cwd()); // Debug Render.com path
 });
 
 module.exports = app; // For Render deployment
