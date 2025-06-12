@@ -1,6 +1,7 @@
-// ==============================
-// routes/bookings.js — Booking routes (Create, Read, Update, Delete)
-// ==============================
+// =========================
+// routes/bookings.js
+// =========================
+// Manages booking CRUD operations.
 
 const express = require("express");
 const router = express.Router();
@@ -8,55 +9,17 @@ const Booking = require("../models/Booking");
 const Event = require("../models/Event");
 const authenticateToken = require("../middleware/authMiddleware");
 
-// ==============================
-// POST - Create a booking
-// ==============================
-router.post("/:eventId/book", authenticateToken, async (req, res) => {
-  const { guestName, contact, notes, avatar } = req.body;
-  const { eventId } = req.params;
-
-  try {
-    const event = await Event.findById(eventId);
-    if (!event) return res.status(404).json({ message: "Event not found" });
-
-    if (event.seatsFilled >= event.seatsTotal) {
-      return res.status(400).json({ message: "Event is already full" });
-    }
-
-    const userId = req.user.id;
-
-    const newBooking = new Booking({
-      guestName,
-      contact,
-      notes,
-      avatar,
-      eventId,
-      userId,
-    });
-
-    await newBooking.save();
-
-    event.bookings.push(newBooking._id);
-    event.seatsFilled += 1;
-    await event.save();
-
-    res.status(201).json(newBooking);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error creating booking", error: err });
-  }
-});
-
-// ==============================
-// GET - All bookings for an event (with user data)
-// ==============================
+/**
+ * GET /api/bookings/:eventId/bookings - Get all bookings for an event
+ * @returns {array} Bookings with user data
+ */
 router.get("/:eventId/bookings", async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId).populate({
       path: "bookings",
       populate: {
         path: "userId",
-        select: "firstName lastName email avatar", // ✅ Ensures consistent profile data
+        select: "firstName lastName email avatar",
       },
     });
 
@@ -64,23 +27,30 @@ router.get("/:eventId/bookings", async (req, res) => {
 
     res.json(event.bookings);
   } catch (err) {
-    console.error(err);
+    console.error("[GET /bookings] Error:", err);
     res
       .status(500)
       .json({ message: "Error fetching bookings", error: err.message });
   }
 });
 
-// ==============================
-// PUT - Update booking notes
-// ==============================
+/**
+ * PUT /api/bookings/:eventId/bookings/:bookingId/note - Update booking notes (host only)
+ * @param {string} notes - Updated notes
+ * @returns {object} Updated booking
+ */
 router.put(
   "/:eventId/bookings/:bookingId/note",
-  authenticateToken,
+  authenticateToken(2),
   async (req, res) => {
     try {
-      const { bookingId } = req.params;
+      const { eventId, bookingId } = req.params;
       const { notes } = req.body;
+
+      const event = await Event.findById(eventId);
+      if (!event || event.hostId.toString() !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
 
       const booking = await Booking.findById(bookingId);
       if (!booking)
@@ -91,16 +61,18 @@ router.put(
 
       res.json({ message: "Note updated", booking });
     } catch (err) {
-      console.error("[PUT booking note] Error:", err);
+      console.error("[PUT /note] Error:", err);
       res
         .status(500)
         .json({ message: "Error updating booking", error: err.message });
     }
   }
 );
-// ==============================
-// DELETE - Guest booking
-// ==============================
+
+/**
+ * DELETE /api/bookings/:bookingId - Cancel booking (guest)
+ * @returns {object} Success message
+ */
 router.delete("/:bookingId", authenticateToken, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.bookingId);
@@ -124,29 +96,32 @@ router.delete("/:bookingId", authenticateToken, async (req, res) => {
     await booking.deleteOne();
     res.json({ message: "Booking cancelled" });
   } catch (err) {
-    console.error("[Guest Cancel Booking] Error:", err);
+    console.error("[DELETE /booking] Error:", err);
     res
       .status(500)
       .json({ message: "Failed to cancel booking", error: err.message });
   }
 });
 
-// ==============================
-// DELETE - Remove a booking (host)
-// ==============================
+/**
+ * DELETE /api/bookings/:eventId/bookings/:bookingId - Remove booking (host)
+ * @returns {object} Success message
+ */
 router.delete(
   "/:eventId/bookings/:bookingId",
-  authenticateToken,
+  authenticateToken(2),
   async (req, res) => {
     try {
       const { eventId, bookingId } = req.params;
 
+      const event = await Event.findById(eventId);
+      if (!event || event.hostId.toString() !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
       const booking = await Booking.findByIdAndDelete(bookingId);
       if (!booking)
         return res.status(404).json({ message: "Booking not found" });
-
-      const event = await Event.findById(eventId);
-      if (!event) return res.status(404).json({ message: "Event not found" });
 
       event.bookings = event.bookings.filter((b) => b.toString() !== bookingId);
       event.seatsFilled = Math.max(0, event.seatsFilled - 1);
@@ -154,7 +129,7 @@ router.delete(
 
       res.json({ message: "Booking removed" });
     } catch (err) {
-      console.error("[DELETE booking] Error:", err);
+      console.error("[DELETE /booking] Error:", err);
       res
         .status(500)
         .json({ message: "Error removing booking", error: err.message });

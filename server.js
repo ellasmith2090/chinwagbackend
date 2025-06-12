@@ -69,19 +69,34 @@ const imageFilter = (req, res, next) => {
   next();
 };
 
+// Serve static files with fallback
 function setupStaticRoutes(app) {
+  // Serve user-uploaded files
   app.use(
-    "/avatars",
+    "/uploads",
     imageFilter,
-    express.static(path.join(__dirname, "uploads", "avatars"))
+    express.static(path.join(__dirname, "uploads"), {
+      fallthrough: true, // Allow fallback
+    })
   );
+  app.use("/uploads", (req, res) => {
+    res
+      .status(404)
+      .sendFile(path.join(__dirname, "public", "static", "default.png"));
+  });
+
+  // Serve static assets
   app.use(
-    "/uploads/events",
-    imageFilter,
-    express.static(path.join(__dirname, "uploads", "events"))
+    "/public",
+    express.static(path.join(__dirname, "public"), {
+      fallthrough: true,
+    })
   );
-  app.use("/images", express.static(path.join(__dirname, "public", "images")));
-  app.use(express.static(path.join(__dirname, "public")));
+  app.use("/public", (req, res) => {
+    res
+      .status(404)
+      .sendFile(path.join(__dirname, "public", "static", "default.png"));
+  });
 }
 setupStaticRoutes(app);
 

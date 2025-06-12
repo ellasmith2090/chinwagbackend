@@ -1,6 +1,7 @@
-// ==============================
-// routes/events.js — Event routes (CRUD, booking + image upload)
-// ==============================
+// =========================
+// routes/events.js
+// =========================
+// Manages event CRUD operations, booking, and image uploads.
 
 const express = require("express");
 const router = express.Router();
@@ -11,18 +12,14 @@ const {
   EVENT_IMAGE_WIDTH,
   EVENT_IMAGE_HEIGHT,
 } = require("../config/constants");
-
 const multer = require("multer");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
-// ==============================
 // Image Upload Setup
-// ==============================
-
-const uploadsDir = path.join(__dirname, "..", "public", "images");
+const uploadsDir = path.join(__dirname, "..", "uploads", "events");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const storage = multer.memoryStorage();
@@ -37,9 +34,10 @@ const upload = multer({
   },
 });
 
-// ==============================
-// GET all events (public)
-// ==============================
+/**
+ * GET /api/events - Get all events (public)
+ * @returns {array} List of events with bookings and user data
+ */
 router.get("/", async (req, res) => {
   try {
     const events = await Event.find()
@@ -59,9 +57,11 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ==============================
-// GET single event by ID
-// ==============================
+/**
+ * GET /api/events/:id - Get single event by ID
+ * @param {string} id - Event ID
+ * @returns {object} Event with bookings and user data
+ */
 router.get("/:id", async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
@@ -75,15 +75,18 @@ router.get("/:id", async (req, res) => {
 
     res.json(event);
   } catch (err) {
+    console.error("[GET /events/:id] Error:", err);
     res
       .status(500)
       .json({ message: "Error fetching event", error: err.message });
   }
 });
 
-// ==============================
-// GET events by host
-// ==============================
+/**
+ * GET /api/events/host/:hostId - Get events by host
+ * @param {string} hostId - Host user ID
+ * @returns {array} List of host's events
+ */
 router.get("/host/:hostId", async (req, res) => {
   try {
     const events = await Event.find({ hostId: req.params.hostId })
@@ -96,28 +99,25 @@ router.get("/host/:hostId", async (req, res) => {
 
     res.json(events);
   } catch (err) {
-    console.error("Error fetching host events:", err);
+    console.error("[GET /events/host/:hostId] Error:", err);
     res
       .status(500)
       .json({ message: "Error fetching host events", error: err.message });
   }
 });
 
-// ==============================
-// POST create event
-// ==============================
+/**
+ * POST /api/events - Create event (host only)
+ * @param {object} body - Event details (title, date, address, description, seatsTotal)
+ * @param {file} image - Event image
+ * @returns {object} Created event
+ */
 router.post(
   "/",
-  authenticateToken,
+  authenticateToken(2),
   upload.single("image"),
   async (req, res) => {
     try {
-      if (req.user.accessLevel !== 2) {
-        return res
-          .status(403)
-          .json({ message: "Only hosts can create events" });
-      }
-
       const { title, date, address, description, seatsTotal } = req.body;
       if (
         !title ||
@@ -132,13 +132,12 @@ router.post(
           .json({ message: "All fields are required including an image" });
       }
 
-      const ext = path.extname(req.file.originalname);
+      const ext = path.extname(req.file.originalname).toLowerCase();
       const filename = `${uuidv4()}${ext}`;
       const filepath = path.join(uploadsDir, filename);
 
       await sharp(req.file.buffer)
         .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .png()
         .toFile(filepath);
 
       const newEvent = new Event({
@@ -164,42 +163,42 @@ router.post(
   }
 );
 
-// ==============================
-// PUT update event image
-// ==============================
+/**
+ * PUT /api/events/:id/image - Update event image (host only)
+ * @param {string} id - Event ID
+ * @param {file} image - New event image
+ * @returns {object} Updated event
+ */
 router.put(
   "/:id/image",
-  authenticateToken,
+  authenticateToken(2),
   upload.single("image"),
   async (req, res) => {
     try {
-      if (req.user.accessLevel !== 2) {
+      const event = await Event.findById(req.params.id);
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      if (event.hostId.toString() !== req.user.id) {
         return res
           .status(403)
-          .json({ message: "Only hosts can update event images" });
+          .json({ message: "Not authorized to update this event" });
       }
 
-      if (!req.file) {
+      if (!req.file)
         return res.status(400).json({ message: "No file uploaded" });
-      }
 
       const filename = `${req.params.id}-${Date.now()}.png`;
       const filepath = path.join(uploadsDir, filename);
 
       await sharp(req.file.buffer)
         .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .png()
         .toFile(filepath);
 
-      const updated = await Event.findByIdAndUpdate(
-        req.params.id,
-        { image: filename },
-        { new: true }
-      );
+      event.image = filename;
+      const updated = await event.save();
 
       res.json({ message: "Image uploaded", image: filename, event: updated });
     } catch (err) {
-      console.error("[PUT /:id/image] Error:", err);
+      console.error("[PUT /events/:id/image] Error:", err);
       res
         .status(500)
         .json({ message: "Image upload failed", error: err.message });
@@ -207,13 +206,20 @@ router.put(
   }
 );
 
-// ==============================
-// PUT update event (details)
-// ==============================
-router.put("/:id", authenticateToken, async (req, res) => {
+/**
+ * PUT /api/events/:id - Update event details (host only)
+ * @param {string} id - Event ID
+ * @param {object} body - Updated event details
+ * @returns {object} Updated event
+ */
+router.put("/:id", authenticateToken(2), async (req, res) => {
   try {
-    if (req.user.accessLevel !== 2) {
-      return res.status(403).json({ message: "Only hosts can update events" });
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    if (event.hostId.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this event" });
     }
 
     const updated = await Event.findByIdAndUpdate(req.params.id, req.body, {
@@ -221,44 +227,51 @@ router.put("/:id", authenticateToken, async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    console.error("[PUT /:id] Error:", err);
+    console.error("[PUT /events/:id] Error:", err);
     res
       .status(500)
       .json({ message: "Error updating event", error: err.message });
   }
 });
 
-// ==============================
-// DELETE event
-// ==============================
-router.delete("/:id", authenticateToken, async (req, res) => {
+/**
+ * DELETE /api/events/:id - Delete event (host only)
+ * @param {string} id - Event ID
+ * @returns {object} Success message
+ */
+router.delete("/:id", authenticateToken(2), async (req, res) => {
   try {
-    if (req.user.accessLevel !== 2) {
-      return res.status(403).json({ message: "Only hosts can delete events" });
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: "Event not found" });
+    if (event.hostId.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete this event" });
     }
 
-    const result = await Event.findByIdAndDelete(req.params.id);
-    if (!result) return res.status(404).json({ message: "Event not found" });
-
+    await event.deleteOne();
     res.json({ message: "Event deleted" });
   } catch (err) {
-    console.error("[DELETE event] Error:", err);
+    console.error("[DELETE /events/:id] Error:", err);
     res
       .status(500)
       .json({ message: "Error deleting event", error: err.message });
   }
 });
 
-// ==============================
-// POST book an event
-// ==============================
+/**
+ * POST /api/events/:id/book - Book an event
+ * @param {string} id - Event ID
+ * @param {object} body - Booking details (guestName, contact, notes)
+ * @returns {object} Booking and updated event
+ */
 router.post("/:id/book", authenticateToken, async (req, res) => {
   try {
     const { guestName, contact, notes } = req.body;
     if (!guestName || !contact) {
       return res
         .status(400)
-        .json({ message: "Guest name and contact are required." });
+        .json({ message: "Guest name and contact are required" });
     }
 
     const event = await Event.findById(req.params.id);
@@ -268,11 +281,10 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
       eventId: event._id,
       userId: req.user.id,
     });
-
     if (alreadyBooked) {
       return res
         .status(400)
-        .json({ message: "You have already booked this event." });
+        .json({ message: "You have already booked this event" });
     }
 
     if (event.seatsFilled >= event.seatsTotal) {
@@ -301,42 +313,11 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
       event: updatedEvent,
     });
   } catch (err) {
-    console.error("[POST /:id/book] Error:", err);
+    console.error("[POST /events/:id/book] Error:", err);
     res
       .status(500)
       .json({ message: "Error processing booking", error: err.message });
   }
 });
-
-// ==============================
-// DELETE a booking (host only or admin)
-// ==============================
-router.delete(
-  "/event/:eventId/bookings/:bookingId",
-  authenticateToken,
-  async (req, res) => {
-    try {
-      const { eventId, bookingId } = req.params;
-
-      const booking = await Booking.findByIdAndDelete(bookingId);
-      if (!booking)
-        return res.status(404).json({ message: "Booking not found" });
-
-      const event = await Event.findById(eventId);
-      if (!event) return res.status(404).json({ message: "Event not found" });
-
-      event.bookings = event.bookings.filter((b) => b.toString() !== bookingId);
-      event.seatsFilled = Math.max(0, event.seatsFilled - 1);
-      await event.save();
-
-      res.json({ message: "Booking removed" });
-    } catch (err) {
-      console.error("[DELETE booking] Error:", err);
-      res
-        .status(500)
-        .json({ message: "Error removing booking", error: err.message });
-    }
-  }
-);
 
 module.exports = router;
