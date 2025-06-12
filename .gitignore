@@ -21,9 +21,11 @@ yarn-debug.log*
 *.map
 .sass-cache/
 
-# User uploads
-uploads/
-
 # Temporary files
 *.bak
 *.tmp
+
+# Ensure public and uploads are not ignored
+!public/
+!public/static/
+!uploads/

@@ -11,6 +11,7 @@ const morgan = require("morgan");
 const connectDB = require("./config/database");
 const errorHandler = require("./middleware/errorHandler");
 const authMiddleware = require("./middleware/authMiddleware");
+const fs = require("fs");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -82,25 +83,33 @@ const setupStaticRoutes = (app) => {
       "static",
       "defaultevent.png"
     );
-    res.status(404).sendFile(defaultImage, (err) => {
-      if (err) {
-        console.error("[Static] Failed to serve default image:", err);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    });
+    console.log("[Static] Checking default image path:", defaultImage);
+    if (fs.existsSync(defaultImage)) {
+      res.status(404).sendFile(defaultImage);
+    } else {
+      console.error("[Static] Default image not found:", defaultImage);
+      res.status(500).json({ error: "Default image not available" });
+    }
   });
 
   // Serve static site assets including banner.png with fallback
-  app.use(
-    "/public",
-    express.static(path.join(__dirname, "public"), {
-      setHeaders: (res) => {
-        res.set("Cache-Control", "public, max-age=31557600");
-      },
-    })
-  );
+  const publicPath = path.join(__dirname, "public");
+  console.log("[Static] Public path configured:", publicPath);
+  if (fs.existsSync(publicPath)) {
+    app.use(
+      "/public",
+      express.static(publicPath, {
+        setHeaders: (res) => {
+          res.set("Cache-Control", "public, max-age=31557600");
+        },
+      })
+    );
+  } else {
+    console.error("[Static] Public directory not found:", publicPath);
+  }
   app.use("/public", (req, res) => {
-    console.warn("[Static] File not found:", req.path);
+    const requestedPath = path.join(publicPath, req.path);
+    console.warn("[Static] File not found:", requestedPath);
     res.status(404).json({ error: "File not found" });
   });
 };
