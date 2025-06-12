@@ -85,24 +85,16 @@ const setupStaticRoutes = (app) => {
     res.status(404).sendFile(defaultImage);
   });
 
+  // Serve static site assets including header.png
   app.use(
     "/public",
     express.static(path.join(__dirname, "public"), {
-      fallthrough: true,
+      fallthrough: false, // don't fallthrough if file is missing
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
       },
     })
   );
-  app.use("/public", (req, res) => {
-    const defaultImage = path.join(
-      __dirname,
-      "public",
-      "static",
-      "defaultavatar.png"
-    );
-    res.status(404).sendFile(defaultImage);
-  });
 };
 setupStaticRoutes(app);
 
