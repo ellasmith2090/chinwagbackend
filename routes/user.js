@@ -6,30 +6,16 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
-const multer = require("multer");
-const sharp = require("sharp");
-const path = require("path");
-const fs = require("fs");
 const authenticateToken = require("../middleware/authMiddleware");
+const { upload, saveImage } = require("../utils/upload");
 const {
   AVATAR_IMAGE_WIDTH,
   AVATAR_IMAGE_HEIGHT,
 } = require("../config/constants");
+const path = require("path");
+const fs = require("fs");
 
-// Setup Multer for memory storage
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.match(/image\/(png|jpg|jpeg)/)) {
-      return cb(new Error("Only PNG or JPG images are allowed"), false);
-    }
-    cb(null, true);
-  },
-});
-
-// Setup upload directory
+// Setup upload directory (ensured by upload.js)
 const uploadsDir = path.join(__dirname, "..", "uploads", "avatars");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -161,6 +147,10 @@ router.delete("/:id", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (user.avatar) {
+      await deleteFile(user.avatar, "avatar");
+    }
+
     res.json({ message: "User deleted" });
   } catch (err) {
     console.error("[DELETE /users/:id] Error:", err);
@@ -192,12 +182,17 @@ router.put(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const filename = `${req.params.id}-${Date.now()}.png`;
-      const filepath = path.join(uploadsDir, filename);
-
-      await sharp(req.file.buffer)
-        .resize(AVATAR_IMAGE_WIDTH, AVATAR_IMAGE_HEIGHT)
-        .toFile(filepath);
+      const oldAvatar = (await User.findById(req.params.id)).avatar;
+      const filename = await saveImage(
+        req.file.originalname,
+        req.file.buffer,
+        "avatar",
+        true,
+        {
+          width: AVATAR_IMAGE_WIDTH,
+          height: AVATAR_IMAGE_HEIGHT,
+        }
+      );
 
       const user = await User.findByIdAndUpdate(
         req.params.id,
@@ -207,6 +202,10 @@ router.put(
 
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      if (oldAvatar) {
+        await deleteFile(oldAvatar, "avatar");
       }
 
       res.json({

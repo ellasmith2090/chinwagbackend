@@ -8,31 +8,17 @@ const router = express.Router();
 const Event = require("../models/Event");
 const Booking = require("../models/Booking");
 const authenticateToken = require("../middleware/authMiddleware");
+const { upload, saveImage, deleteFile } = require("../utils/upload");
 const {
   EVENT_IMAGE_WIDTH,
   EVENT_IMAGE_HEIGHT,
 } = require("../config/constants");
-const multer = require("multer");
-const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const { v4: uuidv4 } = require("uuid");
 
-// Image Upload Setup
+// Setup upload directory (ensured by upload.js)
 const uploadsDir = path.join(__dirname, "..", "uploads", "events");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files are allowed"), false);
-    }
-    cb(null, true);
-  },
-});
 
 /**
  * GET /api/events - Get all events (public)
@@ -132,13 +118,16 @@ router.post(
           .json({ message: "All fields are required including an image" });
       }
 
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      const filename = `${uuidv4()}${ext}`;
-      const filepath = path.join(uploadsDir, filename);
-
-      await sharp(req.file.buffer)
-        .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .toFile(filepath);
+      const filename = await saveImage(
+        req.file.originalname,
+        req.file.buffer,
+        "event",
+        true,
+        {
+          width: EVENT_IMAGE_WIDTH,
+          height: EVENT_IMAGE_HEIGHT,
+        }
+      );
 
       const newEvent = new Event({
         title,
@@ -186,15 +175,24 @@ router.put(
       if (!req.file)
         return res.status(400).json({ message: "No file uploaded" });
 
-      const filename = `${req.params.id}-${Date.now()}.png`;
-      const filepath = path.join(uploadsDir, filename);
-
-      await sharp(req.file.buffer)
-        .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .toFile(filepath);
+      const oldImage = event.image;
+      const filename = await saveImage(
+        req.file.originalname,
+        req.file.buffer,
+        "event",
+        true,
+        {
+          width: EVENT_IMAGE_WIDTH,
+          height: EVENT_IMAGE_HEIGHT,
+        }
+      );
 
       event.image = filename;
       const updated = await event.save();
+
+      if (oldImage) {
+        await deleteFile(oldImage, "event");
+      }
 
       res.json({ message: "Image uploaded", image: filename, event: updated });
     } catch (err) {
@@ -247,6 +245,10 @@ router.delete("/:id", authenticateToken(2), async (req, res) => {
       return res
         .status(403)
         .json({ message: "Not authorized to delete this event" });
+    }
+
+    if (event.image) {
+      await deleteFile(event.image, "event");
     }
 
     await event.deleteOne();
