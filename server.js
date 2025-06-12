@@ -65,36 +65,44 @@ const imageFilter = (req, res, next) => {
 };
 
 const setupStaticRoutes = (app) => {
+  // Serve uploaded images with filter and fallback
   app.use(
     "/uploads",
     imageFilter,
     express.static(path.join(__dirname, "uploads"), {
-      fallthrough: true,
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
       },
     })
   );
-  app.use("/uploads", (req, res) => {
+  app.use("/uploads", (req, res, next) => {
     const defaultImage = path.join(
       __dirname,
       "public",
       "static",
       "defaultevent.png"
     );
-    res.status(404).sendFile(defaultImage);
+    res.status(404).sendFile(defaultImage, (err) => {
+      if (err) {
+        console.error("[Static] Failed to serve default image:", err);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   });
 
-  // Serve static site assets including banner.png
+  // Serve static site assets including banner.png with fallback
   app.use(
     "/public",
     express.static(path.join(__dirname, "public"), {
-      fallthrough: false, // don't fallthrough if file is missing
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
       },
     })
   );
+  app.use("/public", (req, res) => {
+    console.warn("[Static] File not found:", req.path);
+    res.status(404).json({ error: "File not found" });
+  });
 };
 setupStaticRoutes(app);
 
