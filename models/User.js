@@ -38,7 +38,7 @@ const userSchema = new Schema(
     },
     avatar: {
       type: String,
-      default: "default.png", // Adjust to match /uploads/avatars/default.png
+      default: "defaultavatar.png",
       validate: {
         validator: function (v) {
           return /\.(png|jpg|jpeg)$/i.test(v);

@@ -25,7 +25,7 @@ const eventSchema = new Schema(
     },
     image: {
       type: String,
-      default: "default-event.png", // Adjust to match /uploads/events/default-event.png
+      default: "defaultevent.png",
     },
     seatsTotal: {
       type: Number,
