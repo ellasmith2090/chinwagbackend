@@ -29,7 +29,7 @@ const bookingSchema = new Schema(
     },
     avatar: {
       type: String,
-      default: "default.png", // Adjust to match static route (e.g., /uploads/avatars/default.png)
+      default: "/uploads/avatars/defaultavatar.png",
     },
     eventId: {
       type: Schema.Types.ObjectId,
