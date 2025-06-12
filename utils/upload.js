@@ -48,10 +48,10 @@ const upload = multer({
  * Saves an image to /uploads/avatars or /uploads/events, optionally resizing.
  * @param {string} originalName - Original filename.
  * @param {Buffer} fileBuffer - Image buffer.
- * @param {string} [type="avatar"] - Type of image
+ * @param {string} [type="avatar"] - Type of image ("avatar" or "event").
  * @param {boolean} [resize=false] - Whether to resize the image.
- * @param {object} [dimensions={ width: 200, height: 200 }] - dimensions.
- * @returns {Promise<string>} saved filename.
+ * @param {object} [dimensions={ width: 200, height: 200 }] - Resize dimensions.
+ * @returns {Promise<string>} The saved filename.
  */
 async function saveImage(
   originalName,
