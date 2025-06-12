@@ -9,11 +9,7 @@
     "lint": "eslint .",
     "test": "jest"
   },
-  "keywords": [
-    "events",
-    "api",
-    "node"
-  ],
+  "keywords": ["events", "api", "node"],
   "author": "Ella Smith",
   "license": "ISC",
   "description": "Backend API for Chinwag Events app",
