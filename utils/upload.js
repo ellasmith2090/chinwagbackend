@@ -1,10 +1,4 @@
-// ==============================
-// utils/upload.js — Image Upload Handler
-// ==============================
-// Handles secure disk-based image uploads using Multer and Sharp.
-// Resizes images with Sharp, saves to /uploads/avatars or /uploads/events.
-// Provides delete functionality. Used for avatars, event photos.
-
+// utils/upload.js
 const multer = require("multer");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
@@ -44,15 +38,6 @@ const upload = multer({
   fileFilter,
 });
 
-/**
- * Saves an image to /uploads/avatars or /uploads/events, optionally resizing.
- * @param {string} originalName - Original filename.
- * @param {Buffer} fileBuffer - Image buffer.
- * @param {string} [type="avatar"] - Type of image ("avatar" or "event").
- * @param {boolean} [resize=false] - Whether to resize the image.
- * @param {object} [dimensions={ width: 200, height: 200 }] - Resize dimensions.
- * @returns {Promise<string>} The saved filename.
- */
 async function saveImage(
   originalName,
   fileBuffer,
@@ -88,24 +73,24 @@ async function saveImage(
   }
 }
 
-/**
- * Deletes an image from /uploads/avatars or /uploads/events.
- * @param {string} fileName - Name of the file to delete.
- * @param {string} [type="avatar"] - Type of image ("avatar" or "event").
- * @returns {Promise<void>}
- */
 function deleteFile(fileName, type = "avatar") {
   return new Promise((resolve, reject) => {
     const dir = type === "avatar" ? "avatars" : "events";
     const filePath = path.join(__dirname, "..", "uploads", dir, fileName);
-    fs.unlink(filePath, (err) => {
+    fs.access(filePath, fs.constants.F_OK, (err) => {
       if (err) {
-        console.error(`⚠️ Failed to delete ${type} file:`, err);
-        reject(err);
-      } else {
-        console.log(`🗑️ ${type} file deleted: ${fileName}`);
-        resolve();
+        console.warn(`⚠️ ${type} file not found: ${fileName}`);
+        return resolve(); // Resolve without error if file doesn't exist
       }
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error(`⚠️ Failed to delete ${type} file:`, err);
+          reject(err);
+        } else {
+          console.log(`🗑️ ${type} file deleted: ${fileName}`);
+          resolve();
+        }
+      });
     });
   });
 }

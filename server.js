@@ -85,7 +85,7 @@ const setupStaticRoutes = (app) => {
     res.status(404).sendFile(defaultImage);
   });
 
-  // Serve static site assets including header.png
+  // Serve static site assets including banner.png
   app.use(
     "/public",
     express.static(path.join(__dirname, "public"), {

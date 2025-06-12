@@ -2,7 +2,7 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 require("mongoose-type-email");
-const Utils = require("../utils/Utils");
+const Utils = require("../utils/authUtils");
 
 const userSchema = new Schema(
   {
@@ -36,6 +36,7 @@ const userSchema = new Schema(
       default: "",
       maxlength: [500, "Bio cannot exceed 500 characters"],
     },
+
     avatar: {
       type: String,
       default: "defaultavatar.png",

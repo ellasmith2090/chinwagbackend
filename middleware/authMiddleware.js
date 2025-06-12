@@ -1,5 +1,5 @@
 // middleware/authMiddleware.js
-const utils = require("../utils/Utils");
+const utils = require("../utils/authUtils");
 
 function authenticateToken(requiredAccessLevel) {
   return (req, res, next) => {

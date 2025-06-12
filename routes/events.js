@@ -1,13 +1,10 @@
-// =========================
-// routes/events.js
-// =========================
-// Manages event CRUD operations, booking, and image uploads.
 const express = require("express");
 const router = express.Router();
 const Event = require("../models/Event");
 const Booking = require("../models/Booking");
 const authenticateToken = require("../middleware/authMiddleware");
 const { upload, saveImage, deleteFile } = require("../utils/upload");
+const { updateSeatsFilled } = require("../utils/eventUtils"); // Import the utility function
 const {
   EVENT_IMAGE_WIDTH,
   EVENT_IMAGE_HEIGHT,
@@ -27,7 +24,6 @@ router.get("/", async (req, res) => {
       })
       .sort({ date: 1 })
       .lean();
-
     res.json(events);
   } catch (err) {
     console.error("[GET /events] Error:", err);
@@ -45,9 +41,7 @@ router.get("/:id", async (req, res) => {
         populate: { path: "userId", select: "firstName lastName email avatar" },
       })
       .lean();
-
     if (!event) return res.status(404).json({ message: "Event not found" });
-
     res.json(event);
   } catch (err) {
     console.error("[GET /events/:id] Error:", err);
@@ -66,7 +60,6 @@ router.get("/host/:hostId", async (req, res) => {
       })
       .sort({ date: 1 })
       .lean();
-
     res.json(events);
   } catch (err) {
     console.error("[GET /events/host/:hostId] Error:", err);
@@ -120,7 +113,6 @@ router.post(
         bookings: [],
         seatsFilled: 0,
       });
-
       const saved = await newEvent.save();
       res.status(201).json(saved);
     } catch (err) {
@@ -265,8 +257,7 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
     await newBooking.save();
 
     event.bookings.push(newBooking._id);
-    event.seatsFilled += 1;
-    await event.save();
+    await updateSeatsFilled(event._id); // Replace direct seatsFilled update
 
     const updatedEvent = await Event.findById(event._id).lean();
 

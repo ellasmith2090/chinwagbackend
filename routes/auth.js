@@ -1,10 +1,6 @@
-// =========================
-// routes/auth.js
-// =========================
-// Handles user authentication and token validation.
 const express = require("express");
 const router = express.Router();
-const Utils = require("../utils/Utils");
+const Utils = require("../utils/authUtils"); // Updated import assuming renaming from utils.js to authUtils.js
 const User = require("../models/User");
 
 router.post("/signin", async (req, res) => {
@@ -15,9 +11,10 @@ router.post("/signin", async (req, res) => {
   }
 
   try {
-    console.log("Attempting to find user:", email); // Debug log
-    const user = await User.findOne({ email }).lean(); // Use .lean() for performance
-    console.log("User found:", user ? "yes" : "no"); // Debug log
+    // Debug logs removed or made conditional (uncomment for development if needed)
+    // if (process.env.NODE_ENV === "development") console.log("Attempting to find user:", email);
+    const user = await User.findOne({ email }).lean();
+    // if (process.env.NODE_ENV === "development") console.log("User found:", user ? "yes" : "no");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -79,7 +76,9 @@ router.get("/validate", async (req, res) => {
     });
   } catch (err) {
     console.error("[GET /validate] Error:", err);
-    res.status(403).json({ message: "Invalid token", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Server error validating token", error: err.message });
   }
 });
 

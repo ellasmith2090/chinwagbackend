@@ -134,58 +134,36 @@ router.delete("/:id", authenticateToken, async (req, res) => {
   }
 });
 
-router.put(
-  "/:id/avatar",
-  authenticateToken,
-  upload.single("avatar"),
-  async (req, res) => {
-    try {
-      if (req.user.id !== req.params.id) {
-        return res
-          .status(403)
-          .json({ message: "Not authorized to update this user" });
-      }
-
-      if (!req.file)
-        return res.status(400).json({ message: "No file uploaded" });
-
-      const oldAvatar = (await User.findById(req.params.id)).avatar;
-      const filename = await saveImage(
-        req.file.originalname,
-        req.file.buffer,
-        "avatar",
-        true,
-        { width: AVATAR_IMAGE_WIDTH, height: AVATAR_IMAGE_HEIGHT }
-      );
-
-      const user = await User.findByIdAndUpdate(
-        req.params.id,
-        { avatar: filename },
-        { new: true }
-      );
-
-      if (!user) return res.status(404).json({ message: "User not found" });
-
-      if (oldAvatar) {
-        try {
-          await deleteFile(oldAvatar, "avatar");
-        } catch (delErr) {
-          console.warn("[PUT /users/:id/avatar] Cleanup failed:", delErr);
-        }
-      }
-
-      res.json({
-        message: "Avatar uploaded successfully",
-        avatar: filename,
-        user: user.toJSON(),
-      });
-    } catch (err) {
-      console.error("[PUT /users/:id/avatar] Error:", err);
-      res
-        .status(500)
-        .json({ message: "Error uploading avatar", error: err.message });
+router.put("/:id", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to update this user" });
     }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.firstName = req.body.firstName || user.firstName;
+    user.lastName = req.body.lastName || user.lastName;
+    user.bio = req.body.bio || user.bio; // Add bio update
+    if (req.body.email && req.body.email !== user.email) {
+      const existing = await User.findOne({ email: req.body.email });
+      if (existing)
+        return res.status(400).json({ message: "Email already in use" });
+      user.email = req.body.email;
+    }
+    if (req.body.password) user.password = req.body.password;
+
+    const updated = await user.save();
+    res.json(updated.toJSON());
+  } catch (err) {
+    console.error("[PUT /users/:id] Error:", err);
+    res
+      .status(500)
+      .json({ message: "Error updating user", error: err.message });
   }
-);
+});
 
 module.exports = router;

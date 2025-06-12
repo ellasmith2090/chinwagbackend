@@ -1,3 +1,4 @@
+// utils.js
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
@@ -33,12 +34,9 @@ class Utils {
     if (![1, 2].includes(accessLevel)) {
       throw new Error("Invalid accessLevel: must be 1 (user) or 2 (admin)");
     }
-    const payload = {
-      _id: user._id,
-      accessLevel,
-    };
+    const payload = { _id: user._id, accessLevel };
     return jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
-      expiresIn: "30m",
+      expiresIn: process.env.JWT_EXPIRES_IN || "30m",
     });
   }
 
@@ -46,6 +44,7 @@ class Utils {
     try {
       return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     } catch (error) {
+      // Consider using a configurable logger instead of console.error
       console.error(
         `JWT verification failed: ${error.name} - ${error.message}`
       );
@@ -54,5 +53,4 @@ class Utils {
   }
 }
 
-const utils = new Utils();
-module.exports = utils;
+module.exports = Utils; // Export class for flexibility
