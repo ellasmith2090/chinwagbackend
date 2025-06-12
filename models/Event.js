@@ -1,15 +1,7 @@
-// =========================
 // models/Event.js
-// =========================
-// Defines the Mongoose schema for events created by hosts.
-
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-/**
- * Mongoose schema for Event model.
- * Represents an event with host, bookings, and image.
- */
 const eventSchema = new Schema(
   {
     title: {
@@ -32,8 +24,8 @@ const eventSchema = new Schema(
       maxlength: [1000, "Description cannot exceed 1000 characters"],
     },
     image: {
-      type: String, // Filename (e.g., "filename.jpg"), served at /uploads/events/filename.jpg
-      default: "default-event.png",
+      type: String,
+      default: "default-event.png", // Adjust to match /uploads/events/default-event.png
     },
     seatsTotal: {
       type: Number,
@@ -66,9 +58,20 @@ const eventSchema = new Schema(
   { timestamps: true }
 );
 
-// Add indexes for performance
+// Optional compound index for uniqueness
+eventSchema.index({ title: 1, date: 1 }, { unique: true });
+// Indexes for performance
 eventSchema.index({ hostId: 1 });
 eventSchema.index({ date: 1 });
 
-// Create and export the Event model
+// Pre-save hook to update seatsFilled (example)
+eventSchema.pre("save", async function (next) {
+  if (this.isModified("bookings")) {
+    const Booking = require("../models/Booking");
+    const count = await Booking.countDocuments({ _id: { $in: this.bookings } });
+    this.seatsFilled = count;
+  }
+  next();
+});
+
 module.exports = mongoose.model("Event", eventSchema);

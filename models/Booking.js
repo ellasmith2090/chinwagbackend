@@ -1,34 +1,35 @@
-// =========================
-// models/Bookings.js
-// =========================
-// Defines the Mongoose schema for bookings, linking guests to events.
-
+// models/Booking.js
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-/**
- * Mongoose schema for Booking model.
- * Represents a guest's booking for an event, with references to User and Event.
- */
 const bookingSchema = new Schema(
   {
     guestName: {
       type: String,
       required: true,
-      trim: true, // Remove whitespace
+      trim: true,
     },
     contact: {
       type: String,
       required: true,
+      validate: {
+        validator: function (v) {
+          return (
+            /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(v) ||
+            /^\+?[\d\s-]{10,}$/.test(v)
+          );
+        },
+        message: "Contact must be a valid email or phone number",
+      },
     },
     notes: {
       type: String,
-      default: "", // Allows hosts to add notes to guest bookings
+      default: "",
       maxlength: [500, "Notes cannot exceed 500 characters"],
     },
     avatar: {
-      type: String, // Filename (e.g., "filename.jpg"), served at /avatars/filename.jpg
-      default: "default.png",
+      type: String,
+      default: "default.png", // Adjust to match static route (e.g., /uploads/avatars/default.png)
     },
     eventId: {
       type: Schema.Types.ObjectId,
@@ -44,9 +45,10 @@ const bookingSchema = new Schema(
   { timestamps: true }
 );
 
-// Add indexes for performance
+// Compound index to prevent duplicate bookings
+bookingSchema.index({ userId: 1, eventId: 1 }, { unique: true });
+// Additional indexes for performance
 bookingSchema.index({ eventId: 1 });
 bookingSchema.index({ userId: 1 });
 
-// Create and export the Booking model
 module.exports = mongoose.model("Booking", bookingSchema);

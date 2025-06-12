@@ -8,6 +8,9 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const morgan = require("morgan");
+const connectDB = require("./config/database");
+const errorHandler = require("./middleware/errorHandler");
+const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -22,13 +25,7 @@ if (!process.env.MONGO_URI) {
 // ==============================
 // MongoDB Connection
 // ==============================
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("DB connected"))
-  .catch((err) => console.error("DB connection failed", err));
+connectDB();
 
 // ==============================
 // Middleware Setup
@@ -38,25 +35,12 @@ const allowedOrigins = [
   "https://chinwagevents.netlify.app",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+app.use(cors({ origin: true, credentials: true }));
 
-// Log HTTP requests
 app.use(morgan("dev"));
-
-// Parse incoming JSON and form data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api", authMiddleware);
 
 // ==============================
 // Static Files (Images & Public)
@@ -69,35 +53,46 @@ const imageFilter = (req, res, next) => {
   next();
 };
 
-// Serve static files with fallback
-function setupStaticRoutes(app) {
-  // Serve user-uploaded files
+const setupStaticRoutes = (app) => {
   app.use(
     "/uploads",
     imageFilter,
     express.static(path.join(__dirname, "uploads"), {
-      fallthrough: true, // Allow fallback
+      fallthrough: true,
+      setHeaders: (res) => {
+        res.set("Cache-Control", "public, max-age=31557600");
+      },
     })
   );
   app.use("/uploads", (req, res) => {
-    res
-      .status(404)
-      .sendFile(path.join(__dirname, "public", "static", "default.png"));
+    const defaultImage = path.join(
+      __dirname,
+      "public",
+      "static",
+      "defaultevent.png"
+    );
+    res.status(404).sendFile(defaultImage);
   });
 
-  // Serve static assets
   app.use(
     "/public",
     express.static(path.join(__dirname, "public"), {
       fallthrough: true,
+      setHeaders: (res) => {
+        res.set("Cache-Control", "public, max-age=31557600");
+      },
     })
   );
   app.use("/public", (req, res) => {
-    res
-      .status(404)
-      .sendFile(path.join(__dirname, "public", "static", "default.png"));
+    const defaultImage = path.join(
+      __dirname,
+      "public",
+      "static",
+      "defaultavatar.png"
+    );
+    res.status(404).sendFile(defaultImage);
   });
-}
+};
 setupStaticRoutes(app);
 
 // ==============================
@@ -110,27 +105,15 @@ app.get("/", (req, res) => {
 // ==============================
 // API Route Mounting
 // ==============================
-const userRouter = require("./routes/user");
-const authRouter = require("./routes/auth");
-const eventsRouter = require("./routes/events");
-const bookingsRouter = require("./routes/bookings");
-
-app.use("/api/user", userRouter);
-app.use("/api/auth", authRouter);
-app.use("/api/events", eventsRouter);
-app.use("/api/bookings", bookingsRouter);
+app.use("/api/user", require("./routes/user"));
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/events", require("./routes/events"));
+app.use("/api/bookings", require("./routes/bookings"));
 
 // ==============================
 // Global Error Middleware
 // ==============================
-app.use((err, req, res, next) => {
-  if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({ error: "CORS policy violation" });
-  }
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal server error" });
-  next();
-});
+app.use(errorHandler);
 
 // ==============================
 // Start Server
@@ -138,3 +121,5 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+module.exports = app; // For Render deployment

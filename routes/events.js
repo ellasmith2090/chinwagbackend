@@ -2,7 +2,6 @@
 // routes/events.js
 // =========================
 // Manages event CRUD operations, booking, and image uploads.
-
 const express = require("express");
 const router = express.Router();
 const Event = require("../models/Event");
@@ -16,14 +15,9 @@ const {
 const path = require("path");
 const fs = require("fs");
 
-// Setup upload directory (ensured by upload.js)
 const uploadsDir = path.join(__dirname, "..", "uploads", "events");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-/**
- * GET /api/events - Get all events (public)
- * @returns {array} List of events with bookings and user data
- */
 router.get("/", async (req, res) => {
   try {
     const events = await Event.find()
@@ -43,11 +37,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-/**
- * GET /api/events/:id - Get single event by ID
- * @param {string} id - Event ID
- * @returns {object} Event with bookings and user data
- */
 router.get("/:id", async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
@@ -68,11 +57,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/**
- * GET /api/events/host/:hostId - Get events by host
- * @param {string} hostId - Host user ID
- * @returns {array} List of host's events
- */
 router.get("/host/:hostId", async (req, res) => {
   try {
     const events = await Event.find({ hostId: req.params.hostId })
@@ -92,12 +76,6 @@ router.get("/host/:hostId", async (req, res) => {
   }
 });
 
-/**
- * POST /api/events - Create event (host only)
- * @param {object} body - Event details (title, date, address, description, seatsTotal)
- * @param {file} image - Event image
- * @returns {object} Created event
- */
 router.post(
   "/",
   authenticateToken(2),
@@ -118,20 +96,22 @@ router.post(
           .json({ message: "All fields are required including an image" });
       }
 
+      const eventDate = new Date(date);
+      if (isNaN(eventDate) || eventDate <= new Date()) {
+        return res.status(400).json({ message: "Date must be in the future" });
+      }
+
       const filename = await saveImage(
         req.file.originalname,
         req.file.buffer,
         "event",
         true,
-        {
-          width: EVENT_IMAGE_WIDTH,
-          height: EVENT_IMAGE_HEIGHT,
-        }
+        { width: EVENT_IMAGE_WIDTH, height: EVENT_IMAGE_HEIGHT }
       );
 
       const newEvent = new Event({
         title,
-        date: new Date(date),
+        date: eventDate,
         address,
         description,
         image: filename,
@@ -152,12 +132,6 @@ router.post(
   }
 );
 
-/**
- * PUT /api/events/:id/image - Update event image (host only)
- * @param {string} id - Event ID
- * @param {file} image - New event image
- * @returns {object} Updated event
- */
 router.put(
   "/:id/image",
   authenticateToken(2),
@@ -181,17 +155,18 @@ router.put(
         req.file.buffer,
         "event",
         true,
-        {
-          width: EVENT_IMAGE_WIDTH,
-          height: EVENT_IMAGE_HEIGHT,
-        }
+        { width: EVENT_IMAGE_WIDTH, height: EVENT_IMAGE_HEIGHT }
       );
 
       event.image = filename;
       const updated = await event.save();
 
       if (oldImage) {
-        await deleteFile(oldImage, "event");
+        try {
+          await deleteFile(oldImage, "event");
+        } catch (delErr) {
+          console.warn("[DELETE /events/image] Cleanup failed:", delErr);
+        }
       }
 
       res.json({ message: "Image uploaded", image: filename, event: updated });
@@ -204,12 +179,6 @@ router.put(
   }
 );
 
-/**
- * PUT /api/events/:id - Update event details (host only)
- * @param {string} id - Event ID
- * @param {object} body - Updated event details
- * @returns {object} Updated event
- */
 router.put("/:id", authenticateToken(2), async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -232,11 +201,6 @@ router.put("/:id", authenticateToken(2), async (req, res) => {
   }
 });
 
-/**
- * DELETE /api/events/:id - Delete event (host only)
- * @param {string} id - Event ID
- * @returns {object} Success message
- */
 router.delete("/:id", authenticateToken(2), async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -248,7 +212,11 @@ router.delete("/:id", authenticateToken(2), async (req, res) => {
     }
 
     if (event.image) {
-      await deleteFile(event.image, "event");
+      try {
+        await deleteFile(event.image, "event");
+      } catch (delErr) {
+        console.warn("[DELETE /events] Cleanup failed:", delErr);
+      }
     }
 
     await event.deleteOne();
@@ -261,12 +229,6 @@ router.delete("/:id", authenticateToken(2), async (req, res) => {
   }
 });
 
-/**
- * POST /api/events/:id/book - Book an event
- * @param {string} id - Event ID
- * @param {object} body - Booking details (guestName, contact, notes)
- * @returns {object} Booking and updated event
- */
 router.post("/:id/book", authenticateToken, async (req, res) => {
   try {
     const { guestName, contact, notes } = req.body;
@@ -300,7 +262,6 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
       eventId: event._id,
       userId: req.user.id,
     });
-
     await newBooking.save();
 
     event.bookings.push(newBooking._id);

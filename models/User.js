@@ -1,18 +1,10 @@
-// =========================
 // models/User.js
-// =========================
-// Defines the Mongoose schema for users (guests and hosts).
-
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 require("mongoose-type-email");
 const Utils = require("../utils/Utils");
 
-/**
- * Mongoose schema for User model.
- * Represents guest or host accounts with authentication and profile data.
- */
-const userSchema = new mongoose.Schema(
+const userSchema = new Schema(
   {
     firstName: {
       type: String,
@@ -45,8 +37,8 @@ const userSchema = new mongoose.Schema(
       maxlength: [500, "Bio cannot exceed 500 characters"],
     },
     avatar: {
-      type: String, // Filename (e.g., "filename.jpg"), served at /avatars/filename.jpg
-      default: "default.png",
+      type: String,
+      default: "default.png", // Adjust to match /uploads/avatars/default.png
       validate: {
         validator: function (v) {
           return /\.(png|jpg|jpeg)$/i.test(v);
@@ -58,11 +50,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Middleware to hash password before saving
-userSchema.pre("save", function (next) {
+userSchema.pre("save", async function (next) {
   if (this.password && this.isModified("password")) {
     try {
-      this.password = Utils.hashPassword(this.password);
+      this.password = await Utils.hashPassword(this.password);
       next();
     } catch (err) {
       next(err);
@@ -72,7 +63,6 @@ userSchema.pre("save", function (next) {
   }
 });
 
-// toJSON override: remove password and __v
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
@@ -80,9 +70,7 @@ userSchema.methods.toJSON = function () {
   return obj;
 };
 
-// Add indexes for performance
 userSchema.index({ email: 1 });
 userSchema.index({ accessLevel: 1 });
 
-// Create and export the User model
 module.exports = mongoose.model("User", userSchema);
