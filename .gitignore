@@ -29,3 +29,4 @@ yarn-debug.log*
 !public/
 !public/static/
 !uploads/
+!uploads/events/
