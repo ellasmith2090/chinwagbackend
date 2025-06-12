@@ -66,34 +66,11 @@ const imageFilter = (req, res, next) => {
 };
 
 const setupStaticRoutes = (app) => {
-  // Serve uploaded images with filter and fallback
-  app.use(
-    "/uploads",
-    imageFilter,
-    express.static(path.join(__dirname, "uploads"), {
-      setHeaders: (res) => {
-        res.set("Cache-Control", "public, max-age=31557600");
-      },
-    })
-  );
-  app.use("/uploads", (req, res, next) => {
-    const defaultImage = path.join(
-      __dirname,
-      "public",
-      "static",
-      "defaultevent.png"
-    );
-    console.log("[Static] Checking default image path:", defaultImage);
-    if (fs.existsSync(defaultImage)) {
-      res.status(404).sendFile(defaultImage);
-    } else {
-      console.error("[Static] Default image not found:", defaultImage);
-      res.status(500).json({ error: "Default image not available" });
-    }
-  });
+  // Base directory for the project (using process.cwd() for Render.com compatibility)
+  const baseDir = process.cwd();
 
-  // Serve static site assets including banner.png with fallback
-  const publicPath = path.join(__dirname, "public");
+  // Serve public/static files
+  const publicPath = path.join(baseDir, "public");
   console.log("[Static] Public path configured:", publicPath);
   if (fs.existsSync(publicPath)) {
     app.use(
@@ -104,15 +81,48 @@ const setupStaticRoutes = (app) => {
         },
       })
     );
+    app.use("/public", (req, res) => {
+      const requestedPath = path.join(publicPath, req.path);
+      console.warn("[Static] File not found:", requestedPath);
+      res.status(404).json({ error: "File not found" });
+    });
   } else {
     console.error("[Static] Public directory not found:", publicPath);
   }
-  app.use("/public", (req, res) => {
-    const requestedPath = path.join(publicPath, req.path);
-    console.warn("[Static] File not found:", requestedPath);
-    res.status(404).json({ error: "File not found" });
-  });
+
+  // Serve uploads directory with filter and fallback
+  const uploadsPath = path.join(baseDir, "uploads");
+  console.log("[Static] Uploads path configured:", uploadsPath);
+  if (fs.existsSync(uploadsPath)) {
+    app.use(
+      "/uploads",
+      imageFilter,
+      express.static(uploadsPath, {
+        setHeaders: (res) => {
+          res.set("Cache-Control", "public, max-age=31557600");
+        },
+      })
+    );
+    app.use("/uploads", (req, res, next) => {
+      const defaultImage = path.join(
+        baseDir,
+        "public",
+        "static",
+        "defaultevent.png"
+      );
+      console.log("[Static] Checking default image path:", defaultImage);
+      if (fs.existsSync(defaultImage)) {
+        res.status(404).sendFile(defaultImage);
+      } else {
+        console.error("[Static] Default image not found:", defaultImage);
+        res.status(500).json({ error: "Default image not available" });
+      }
+    });
+  } else {
+    console.error("[Static] Uploads directory not found:", uploadsPath);
+  }
 };
+
 setupStaticRoutes(app);
 
 // ==============================
