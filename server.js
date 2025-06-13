@@ -31,19 +31,25 @@ connectDB();
 // Middleware Setup
 // ==============================
 const allowedOrigins = [
-  "https://chinwagevents.netlify.app", // Removed http://localhost:1234
+  "http://localhost:59604",
+  "https://chinwagevents.netlify.app", // Exact match, no trailing slash
 ];
 
+// Temporary fallback for debugging (remove after testing)
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log("Received origin:", origin); // Debug log
     if (!origin || allowedOrigins.includes(origin)) {
+      console.log("CORS allowed for origin:", origin);
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      console.log("CORS rejected for origin:", origin); // Debug log
+      // Temporary fallback: Allow all origins for testing
+      callback(null, { origin: true }); // Allows the request but logs the rejection
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions)); // Apply CORS globally
@@ -63,7 +69,7 @@ console.log("Base directory:", baseDir);
 const publicPath = path.join(baseDir, "public");
 if (fs.existsSync(publicPath)) {
   app.use(
-    "/images", // Serve as /images to match frontend's imageBase
+    "/images",
     express.static(publicPath, {
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
