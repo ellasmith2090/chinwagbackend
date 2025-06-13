@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "test": "jest"
   },
-  "keywords": ["events", "api", "node"],
+  "keywords": [
+    "events",
+    "api",
+    "node"
+  ],
   "author": "Ella Smith",
   "license": "ISC",
   "description": "Backend API for Chinwag Events app",
@@ -26,7 +30,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "eslint": "^9.9.0",
+    "eslint": "^9.29.0",
     "jest": "^29.7.0",
     "nodemon": "^3.1.10"
   }

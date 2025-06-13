@@ -1,4 +1,8 @@
 // utils/eventUtils.js
+/**
+ * Recalculates how many seats are filled for a given event,
+ * based on current bookings, and updates the Event document.
+ */
 const Event = require("../models/Event");
 const Booking = require("../models/Booking");
 

@@ -1,56 +1,38 @@
 // utils.js
-const crypto = require("crypto");
+
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-class Utils {
-  constructor() {
-    if (!process.env.ACCESS_TOKEN_SECRET) {
-      throw new Error("ACCESS_TOKEN_SECRET environment variable is not set");
-    }
-  }
+if (!process.env.ACCESS_TOKEN_SECRET) {
+  throw new Error("ACCESS_TOKEN_SECRET environment variable is not set");
+}
 
-  async hashPassword(password) {
-    const salt = crypto.randomBytes(16).toString("hex");
-    return new Promise((resolve, reject) => {
-      crypto.pbkdf2(password, salt, 2048, 32, "sha512", (err, hash) => {
-        if (err) reject(err);
-        resolve([salt, hash.toString("hex")].join("$"));
-      });
-    });
-  }
-
-  async verifyPassword(password, original) {
-    const [salt, originalHash] = original.split("$");
-    return new Promise((resolve, reject) => {
-      crypto.pbkdf2(password, salt, 2048, 32, "sha512", (err, hash) => {
-        if (err) reject(err);
-        resolve(hash.toString("hex") === originalHash);
-      });
-    });
-  }
-
-  generateAccessToken(user) {
+module.exports = {
+  hashPassword: async (password) => {
+    const salt = await bcrypt.genSalt(10);
+    return await bcrypt.hash(password, salt);
+  },
+  verifyPassword: async (password, hash) =>
+    await bcrypt.compare(password, hash),
+  generateAccessToken: (user) => {
     const accessLevel = user.accessLevel || 1;
     if (![1, 2].includes(accessLevel)) {
-      throw new Error("Invalid accessLevel: must be 1 (user) or 2 (admin)");
+      throw new Error("Invalid accessLevel: must be 1 (guest) or 2 (host)");
     }
-    const payload = { _id: user._id, accessLevel };
-    return jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || "30m",
-    });
-  }
-
-  verifyToken(token) {
+    return jwt.sign(
+      { _id: user._id, accessLevel, iat: Math.floor(Date.now() / 1000) },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "1h" }
+    );
+  },
+  verifyToken: (token) => {
     try {
       return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     } catch (error) {
-      // Consider using a configurable logger instead of console.error
       console.error(
         `JWT verification failed: ${error.name} - ${error.message}`
       );
-      return null;
+      return { error: error.message };
     }
-  }
-}
-
-module.exports = Utils; // Export class for flexibility
+  },
+};
