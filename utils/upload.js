@@ -1,28 +1,24 @@
-// ==============================
-// utils/upload.js — Image Upload Handler
-// ==============================
-// Handles secure in-memory image uploads using Multer.
-// Resizes images with Sharp, saves to /uploads/avatars or /uploads/events.
-// Provides delete functionality. Used for avatars, event photos.
-
+// utils/upload.js
 const multer = require("multer");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 
-/**
- * Configures Multer for in-memory storage with file type and size limits.
- */
-const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(
+      null,
+      file.fieldname === "avatar" ? "uploads/avatars/" : "uploads/events/"
+    );
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`);
+  },
+});
+
 const maxSize = 10 * 1024 * 1024; // 10MB
 
-/**
- * Filters files to allow only PNG and JPG, validating image integrity.
- * @param {object} req - Express request object.
- * @param {object} file - Uploaded file object.
- * @param {function} cb - Callback function.
- */
 const fileFilter = async (req, file, cb) => {
   const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
   if (!allowedTypes.includes(file.mimetype)) {
@@ -36,24 +32,12 @@ const fileFilter = async (req, file, cb) => {
   }
 };
 
-/**
- * Multer middleware for image uploads.
- */
 const upload = multer({
   storage,
   limits: { fileSize: maxSize },
   fileFilter,
 });
 
-/**
- * Saves an image to /uploads/avatars or /uploads/events, optionally resizing.
- * @param {string} originalName - Original filename.
- * @param {Buffer} fileBuffer - Image buffer.
- * @param {string} [type="avatar"] - Type of image ("avatar" or "event").
- * @param {boolean} [resize=false] - Whether to resize the image.
- * @param {object} [dimensions={ width: 200, height: 200 }] - Resize dimensions.
- * @returns {Promise<string>} The saved filename.
- */
 async function saveImage(
   originalName,
   fileBuffer,
@@ -66,7 +50,7 @@ async function saveImage(
   const outputDir = path.join(
     __dirname,
     "..",
-    "Uploads",
+    "uploads",
     type === "avatar" ? "avatars" : "events"
   );
   const outputPath = path.join(outputDir, fileName);
@@ -89,24 +73,24 @@ async function saveImage(
   }
 }
 
-/**
- * Deletes an image from /uploads/avatars or /uploads/events.
- * @param {string} fileName - Name of the file to delete.
- * @param {string} [type="avatar"] - Type of image ("avatar" or "event").
- * @returns {Promise<void>}
- */
 function deleteFile(fileName, type = "avatar") {
   return new Promise((resolve, reject) => {
     const dir = type === "avatar" ? "avatars" : "events";
-    const filePath = path.join(__dirname, "..", "Uploads", dir, fileName);
-    fs.unlink(filePath, (err) => {
+    const filePath = path.join(__dirname, "..", "uploads", dir, fileName);
+    fs.access(filePath, fs.constants.F_OK, (err) => {
       if (err) {
-        console.error(`⚠️ Failed to delete ${type} file:`, err);
-        reject(err);
-      } else {
-        console.log(`🗑️ ${type} file deleted: ${fileName}`);
-        resolve();
+        console.warn(`⚠️ ${type} file not found: ${fileName}`);
+        return resolve(); // Resolve without error if file doesn't exist
       }
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error(`⚠️ Failed to delete ${type} file:`, err);
+          reject(err);
+        } else {
+          console.log(`🗑️ ${type} file deleted: ${fileName}`);
+          resolve();
+        }
+      });
     });
   });
 }

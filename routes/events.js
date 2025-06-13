@@ -1,43 +1,20 @@
-// =========================
-// routes/events.js
-// =========================
-// Manages event CRUD operations, booking, and image uploads.
-
 const express = require("express");
 const router = express.Router();
 const Event = require("../models/Event");
 const Booking = require("../models/Booking");
 const authenticateToken = require("../middleware/authMiddleware");
+const { upload, saveImage, deleteFile } = require("../utils/upload");
+const { updateSeatsFilled } = require("../utils/eventUtils"); // Import the utility function
 const {
   EVENT_IMAGE_WIDTH,
   EVENT_IMAGE_HEIGHT,
 } = require("../config/constants");
-const multer = require("multer");
-const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const { v4: uuidv4 } = require("uuid");
 
-// Image Upload Setup
 const uploadsDir = path.join(__dirname, "..", "uploads", "events");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files are allowed"), false);
-    }
-    cb(null, true);
-  },
-});
-
-/**
- * GET /api/events - Get all events (public)
- * @returns {array} List of events with bookings and user data
- */
 router.get("/", async (req, res) => {
   try {
     const events = await Event.find()
@@ -47,7 +24,6 @@ router.get("/", async (req, res) => {
       })
       .sort({ date: 1 })
       .lean();
-
     res.json(events);
   } catch (err) {
     console.error("[GET /events] Error:", err);
@@ -57,11 +33,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-/**
- * GET /api/events/:id - Get single event by ID
- * @param {string} id - Event ID
- * @returns {object} Event with bookings and user data
- */
 router.get("/:id", async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
@@ -70,9 +41,7 @@ router.get("/:id", async (req, res) => {
         populate: { path: "userId", select: "firstName lastName email avatar" },
       })
       .lean();
-
     if (!event) return res.status(404).json({ message: "Event not found" });
-
     res.json(event);
   } catch (err) {
     console.error("[GET /events/:id] Error:", err);
@@ -82,11 +51,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/**
- * GET /api/events/host/:hostId - Get events by host
- * @param {string} hostId - Host user ID
- * @returns {array} List of host's events
- */
 router.get("/host/:hostId", async (req, res) => {
   try {
     const events = await Event.find({ hostId: req.params.hostId })
@@ -96,7 +60,6 @@ router.get("/host/:hostId", async (req, res) => {
       })
       .sort({ date: 1 })
       .lean();
-
     res.json(events);
   } catch (err) {
     console.error("[GET /events/host/:hostId] Error:", err);
@@ -106,12 +69,6 @@ router.get("/host/:hostId", async (req, res) => {
   }
 });
 
-/**
- * POST /api/events - Create event (host only)
- * @param {object} body - Event details (title, date, address, description, seatsTotal)
- * @param {file} image - Event image
- * @returns {object} Created event
- */
 router.post(
   "/",
   authenticateToken(2),
@@ -132,17 +89,22 @@ router.post(
           .json({ message: "All fields are required including an image" });
       }
 
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      const filename = `${uuidv4()}${ext}`;
-      const filepath = path.join(uploadsDir, filename);
+      const eventDate = new Date(date);
+      if (isNaN(eventDate) || eventDate <= new Date()) {
+        return res.status(400).json({ message: "Date must be in the future" });
+      }
 
-      await sharp(req.file.buffer)
-        .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .toFile(filepath);
+      const filename = await saveImage(
+        req.file.originalname,
+        req.file.buffer,
+        "event",
+        true,
+        { width: EVENT_IMAGE_WIDTH, height: EVENT_IMAGE_HEIGHT }
+      );
 
       const newEvent = new Event({
         title,
-        date: new Date(date),
+        date: eventDate,
         address,
         description,
         image: filename,
@@ -151,7 +113,6 @@ router.post(
         bookings: [],
         seatsFilled: 0,
       });
-
       const saved = await newEvent.save();
       res.status(201).json(saved);
     } catch (err) {
@@ -163,12 +124,6 @@ router.post(
   }
 );
 
-/**
- * PUT /api/events/:id/image - Update event image (host only)
- * @param {string} id - Event ID
- * @param {file} image - New event image
- * @returns {object} Updated event
- */
 router.put(
   "/:id/image",
   authenticateToken(2),
@@ -186,15 +141,25 @@ router.put(
       if (!req.file)
         return res.status(400).json({ message: "No file uploaded" });
 
-      const filename = `${req.params.id}-${Date.now()}.png`;
-      const filepath = path.join(uploadsDir, filename);
-
-      await sharp(req.file.buffer)
-        .resize(EVENT_IMAGE_WIDTH, EVENT_IMAGE_HEIGHT)
-        .toFile(filepath);
+      const oldImage = event.image;
+      const filename = await saveImage(
+        req.file.originalname,
+        req.file.buffer,
+        "event",
+        true,
+        { width: EVENT_IMAGE_WIDTH, height: EVENT_IMAGE_HEIGHT }
+      );
 
       event.image = filename;
       const updated = await event.save();
+
+      if (oldImage) {
+        try {
+          await deleteFile(oldImage, "event");
+        } catch (delErr) {
+          console.warn("[DELETE /events/image] Cleanup failed:", delErr);
+        }
+      }
 
       res.json({ message: "Image uploaded", image: filename, event: updated });
     } catch (err) {
@@ -206,12 +171,6 @@ router.put(
   }
 );
 
-/**
- * PUT /api/events/:id - Update event details (host only)
- * @param {string} id - Event ID
- * @param {object} body - Updated event details
- * @returns {object} Updated event
- */
 router.put("/:id", authenticateToken(2), async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -234,11 +193,6 @@ router.put("/:id", authenticateToken(2), async (req, res) => {
   }
 });
 
-/**
- * DELETE /api/events/:id - Delete event (host only)
- * @param {string} id - Event ID
- * @returns {object} Success message
- */
 router.delete("/:id", authenticateToken(2), async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -247,6 +201,14 @@ router.delete("/:id", authenticateToken(2), async (req, res) => {
       return res
         .status(403)
         .json({ message: "Not authorized to delete this event" });
+    }
+
+    if (event.image) {
+      try {
+        await deleteFile(event.image, "event");
+      } catch (delErr) {
+        console.warn("[DELETE /events] Cleanup failed:", delErr);
+      }
     }
 
     await event.deleteOne();
@@ -259,12 +221,6 @@ router.delete("/:id", authenticateToken(2), async (req, res) => {
   }
 });
 
-/**
- * POST /api/events/:id/book - Book an event
- * @param {string} id - Event ID
- * @param {object} body - Booking details (guestName, contact, notes)
- * @returns {object} Booking and updated event
- */
 router.post("/:id/book", authenticateToken, async (req, res) => {
   try {
     const { guestName, contact, notes } = req.body;
@@ -298,12 +254,10 @@ router.post("/:id/book", authenticateToken, async (req, res) => {
       eventId: event._id,
       userId: req.user.id,
     });
-
     await newBooking.save();
 
     event.bookings.push(newBooking._id);
-    event.seatsFilled += 1;
-    await event.save();
+    await updateSeatsFilled(event._id); // Replace direct seatsFilled update
 
     const updatedEvent = await Event.findById(event._id).lean();
 

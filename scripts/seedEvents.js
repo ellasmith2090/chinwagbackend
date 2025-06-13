@@ -72,7 +72,7 @@ async function seed() {
       email: "host@chinwag.com",
       password: "Host123!",
       accessLevel: 2,
-      avatar: "default.png",
+      avatar: "defaultavatar.png",
     });
     const guestUser = await User.create({
       firstName: "Demo",
@@ -80,7 +80,7 @@ async function seed() {
       email: "guest@chinwag.com",
       password: "Guest123!",
       accessLevel: 1,
-      avatar: "default.png",
+      avatar: "defaultavatar.png",
     });
     console.log("👤 Demo users created (host, guest)");
 
@@ -135,7 +135,7 @@ async function seed() {
         guestName: "Demo Guest",
         contact: "guest@chinwag.com",
         notes: "",
-        avatar: "default.png",
+        avatar: "defaultavatar.png",
         eventId: demoEvents[0]._id,
         userId: guestUser._id,
       },

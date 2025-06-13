@@ -1,22 +1,14 @@
+// utils.js
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 class Utils {
-  /**
-   * Initializes Utils and validates environment variables.
-   * @throws {Error} If ACCESS_TOKEN_SECRET is not set.
-   */
   constructor() {
     if (!process.env.ACCESS_TOKEN_SECRET) {
       throw new Error("ACCESS_TOKEN_SECRET environment variable is not set");
     }
   }
 
-  /**
-   * Hashes a password using PBKDF2 with a random salt.
-   * @param {string} password - The plaintext password to hash.
-   * @returns {Promise<string>} The salt and hash joined by `$` (e.g., `salt$hash`).
-   */
   async hashPassword(password) {
     const salt = crypto.randomBytes(16).toString("hex");
     return new Promise((resolve, reject) => {
@@ -27,12 +19,6 @@ class Utils {
     });
   }
 
-  /**
-   * Verifies a password against a stored hash.
-   * @param {string} password - The plaintext password to verify.
-   * @param {string} original - The stored salt and hash (e.g., `salt$hash`).
-   * @returns {Promise<boolean>} True if the password matches, false otherwise.
-   */
   async verifyPassword(password, original) {
     const [salt, originalHash] = original.split("$");
     return new Promise((resolve, reject) => {
@@ -43,35 +29,22 @@ class Utils {
     });
   }
 
-  /**
-   * Generates a JWT access token for user.
-   * @param {object} user - user object with _id and accessLevel (1 for user, 2 for admin).
-   * @returns {string} signed JWT token.
-   * @throws {Error} If accessLevel is not 1 or 2.
-   */
   generateAccessToken(user) {
-    const accessLevel = user.accessLevel || 1; // default to user
+    const accessLevel = user.accessLevel || 1;
     if (![1, 2].includes(accessLevel)) {
       throw new Error("Invalid accessLevel: must be 1 (user) or 2 (admin)");
     }
-    const payload = {
-      _id: user._id,
-      accessLevel,
-    };
+    const payload = { _id: user._id, accessLevel };
     return jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
-      expiresIn: "30m",
+      expiresIn: process.env.JWT_EXPIRES_IN || "30m",
     });
   }
 
-  /**
-   * Verifies JWT token.
-   * @param {string} token - The JWT token to verify.
-   * @returns {object|null} decoded payload if valid, null if not.
-   */
   verifyToken(token) {
     try {
       return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     } catch (error) {
+      // Consider using a configurable logger instead of console.error
       console.error(
         `JWT verification failed: ${error.name} - ${error.message}`
       );
@@ -80,5 +53,4 @@ class Utils {
   }
 }
 
-const utils = new Utils();
-module.exports = utils;
+module.exports = Utils; // Export class for flexibility

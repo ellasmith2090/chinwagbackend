@@ -1,40 +1,17 @@
-// =========================
-// models/Event.js
-// =========================
-// Defines the Mongoose schema for events created by hosts.
-
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-/**
- * Mongoose schema for Event model.
- * Represents an event with host, bookings, and image.
- */
 const eventSchema = new Schema(
   {
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    date: {
-      type: Date,
-      required: true,
-    },
-    address: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    title: { type: String, required: true, trim: true },
+    date: { type: Date, required: true },
+    address: { type: String, required: true, trim: true },
     description: {
       type: String,
       required: true,
       maxlength: [1000, "Description cannot exceed 1000 characters"],
     },
-    image: {
-      type: String, // Filename (e.g., "filename.jpg"), served at /uploads/events/filename.jpg
-      default: "default-event.png",
-    },
+    image: { type: String, default: "defaultevent.png" },
     seatsTotal: {
       type: Number,
       required: true,
@@ -51,24 +28,21 @@ const eventSchema = new Schema(
         message: "Filled seats cannot exceed total seats",
       },
     },
-    hostId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    bookings: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Booking",
-      },
-    ],
+    hostId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    bookings: [{ type: Schema.Types.ObjectId, ref: "Booking" }],
   },
   { timestamps: true }
 );
 
-// Add indexes for performance
+eventSchema.index({ title: 1, date: 1 }, { unique: true });
 eventSchema.index({ hostId: 1 });
 eventSchema.index({ date: 1 });
 
-// Create and export the Event model
+eventSchema.pre("save", function (next) {
+  if (this.seatsFilled > this.seatsTotal) {
+    return next(new Error("Filled seats cannot exceed total seats"));
+  }
+  next();
+});
+
 module.exports = mongoose.model("Event", eventSchema);
