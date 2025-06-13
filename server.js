@@ -31,29 +31,28 @@ connectDB();
 // Middleware Setup
 // ==============================
 const allowedOrigins = [
-  "http://localhost:1234",
-  "https://chinwagevents.netlify.app",
+  "https://chinwagevents.netlify.app", // Removed http://localhost:1234
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+};
 
+app.use(cors(corsOptions)); // Apply CORS globally
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Apply authMiddleware only to protected routes (not all /api)
-app.use("/api/protected", authMiddleware); // Example: Apply to specific protected routes
+// Apply authMiddleware only to protected routes
+app.use("/api/protected", authMiddleware);
 
 // ==============================
 // Static Files (Images & Public)
