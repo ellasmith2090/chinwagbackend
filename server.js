@@ -14,7 +14,6 @@ const authMiddleware = require("./middleware/authMiddleware");
 const fs = require("fs");
 
 const app = express();
-const port = process.env.PORT || 3000;
 
 // ==============================
 // Environment Variable Validation
@@ -52,33 +51,27 @@ app.use(
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/api", authMiddleware);
+
+// Apply authMiddleware only to protected routes (not all /api)
+app.use("/api/protected", authMiddleware); // Example: Apply to specific protected routes
 
 // ==============================
 // Static Files (Images & Public)
 // ==============================
-const imageFilter = (req, res, next) => {
-  const ext = path.extname(req.path).toLowerCase();
-  if (![".png", ".jpg", ".jpeg", ".gif"].includes(ext)) {
-    return res.status(403).json({ error: "Invalid file type" });
-  }
-  next();
-};
-
 const baseDir = process.cwd();
 console.log("Base directory:", baseDir);
 
 const publicPath = path.join(baseDir, "public");
 if (fs.existsSync(publicPath)) {
   app.use(
-    "/public",
+    "/images", // Serve as /images to match frontend's imageBase
     express.static(publicPath, {
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
       },
     })
   );
-  app.use("/public", (req, res) => {
+  app.use("/images", (req, res) => {
     const requestedPath = path.join(publicPath, req.path);
     console.warn("[Static] File not found:", requestedPath);
     res.status(404).json({ error: "File not found" });
@@ -91,7 +84,13 @@ const uploadsPath = path.join(baseDir, "uploads");
 if (fs.existsSync(uploadsPath)) {
   app.use(
     "/uploads",
-    imageFilter,
+    (req, res, next) => {
+      const ext = path.extname(req.path).toLowerCase();
+      if (![".png", ".jpg", ".jpeg", ".gif"].includes(ext)) {
+        return res.status(403).json({ error: "Invalid file type" });
+      }
+      next();
+    },
     express.static(uploadsPath, {
       setHeaders: (res) => {
         res.set("Cache-Control", "public, max-age=31557600");
@@ -102,7 +101,7 @@ if (fs.existsSync(uploadsPath)) {
     const fallbackImage = path.join(
       baseDir,
       "public",
-      "static",
+      "images",
       "defaultevent.png"
     );
     console.log("[Static] Checking fallback image:", fallbackImage);
@@ -140,6 +139,7 @@ app.use(errorHandler);
 // ==============================
 // Start Server
 // ==============================
+const port = process.env.PORT || 10000; // Match Render's detected port
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log("Current working directory:", process.cwd());

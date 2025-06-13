@@ -1,6 +1,7 @@
+// routes/auth.js
 const express = require("express");
 const router = express.Router();
-const Utils = require("../utils/authUtils"); // Updated import assuming renaming from utils.js to authUtils.js
+const Utils = require("../utils/authUtils");
 const User = require("../models/User");
 
 router.post("/signin", async (req, res) => {
@@ -11,10 +12,11 @@ router.post("/signin", async (req, res) => {
   }
 
   try {
-    // Debug logs removed or made conditional (uncomment for development if needed)
-    // if (process.env.NODE_ENV === "development") console.log("Attempting to find user:", email);
+    if (process.env.NODE_ENV === "development")
+      console.log("Attempting to find user:", email);
     const user = await User.findOne({ email }).lean();
-    // if (process.env.NODE_ENV === "development") console.log("User found:", user ? "yes" : "no");
+    if (process.env.NODE_ENV === "development")
+      console.log("User found:", user ? "yes" : "no");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -54,12 +56,14 @@ router.get("/validate", async (req, res) => {
   }
 
   try {
+    if (process.env.NODE_ENV === "development")
+      console.log("Validating token:", token);
     const decoded = Utils.verifyToken(token);
-    if (!decoded) {
+    if (!decoded || !decoded.id) {
       return res.status(403).json({ message: "Invalid token" });
     }
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
